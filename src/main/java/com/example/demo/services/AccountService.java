@@ -1,7 +1,9 @@
 package com.example.demo.services;
 
+import com.example.demo.exceptions.ApplicationException;
 import com.example.demo.model.Account;
 import com.example.demo.repo.AccountRepository;
+import com.sun.istack.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,9 +19,14 @@ public class AccountService {
 	private final AccountRepository accountRepository;
 
 	@Transactional
+	public void remittance(String sourceAccountNumber, String targetAccountNumber, BigDecimal amount) {
+		withdraw(sourceAccountNumber, amount);
+		replenishBalance(targetAccountNumber, amount);
+	}
+
+	@Transactional
 	public void replenishBalance(String accountNumber, BigDecimal amount) {
-		Account account = accountRepository.findByAccountNumber(accountNumber)
-				.orElseThrow(() -> new RuntimeException("Счёта с номером: " + accountNumber + " не существует"));
+		Account account = getAccount(accountNumber);
 		replenishAccountBalance(account, amount);
 	}
 
@@ -46,9 +53,7 @@ public class AccountService {
 
 	@Transactional
 	public BigDecimal withdraw(String accountNumber, BigDecimal amount) {
-		Account account = accountRepository.findByAccountNumber(accountNumber)
-				.orElseThrow(() -> new RuntimeException("Счёта с номером: " + accountNumber + " не существует"));
-
+		Account account = getAccount(accountNumber);
 		return withdraw(account, amount);
 	}
 
@@ -57,7 +62,7 @@ public class AccountService {
 		BigDecimal newBalance = currentBalance.subtract(amount);
 
 		if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-			throw new RuntimeException("Вы не можете списать больше, чем есть на вашем счёте");
+			throw new ApplicationException("Вы не можете списать больше, чем есть на вашем счёте");
 		}
 
 		account.setBalance(newBalance);
@@ -66,8 +71,13 @@ public class AccountService {
 
 	@Transactional
 	public BigDecimal getBalance(String accountNumber) {
-		Account account = accountRepository.findByAccountNumber(accountNumber)
-				.orElseThrow(() -> new RuntimeException("Счёта с номером: " + accountNumber + " не существует"));
+		Account account = getAccount(accountNumber);
 		return account.getBalance();
+	}
+
+	@NotNull
+	private Account getAccount(String accountNumber) {
+		return accountRepository.findByAccountNumber(accountNumber)
+				.orElseThrow(() -> new ApplicationException("Счёта с номером: " + accountNumber + " не существует"));
 	}
 }
